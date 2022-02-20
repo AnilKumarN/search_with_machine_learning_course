@@ -1,4 +1,32 @@
 {
+  "mappings": {
+    "properties": {
+      "user": {
+        "type": "keyword"
+      },
+      "sku": {
+        "type": "keyword"
+      },
+      "category": {
+        "type": "keyword"
+      },
+      "query": {
+        "type": "text",
+        "fields": {
+          "keyword": {
+            "type": "keyword"
+          }
+        },
+        "analyzer": "english"
+      },
+      "click_time": {
+        "type": "keyword"
+      },
+      "query_time": {
+        "type": "keyword"
+      }
+    }
+  },
   "settings": {
     "index.refresh_interval": "5s"
   }
