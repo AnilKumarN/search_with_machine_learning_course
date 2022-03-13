@@ -1,13 +1,16 @@
-import os
 import argparse
-import xml.etree.ElementTree as ET
-import pandas as pd
-import numpy as np
 import csv
+import os
+import string
+import xml.etree.ElementTree as ET
 
 # Useful if you want to perform stemming.
 import nltk
-stemmer = nltk.stem.PorterStemmer()
+import numpy as np
+import pandas as pd
+from nltk.stem.snowball import SnowballStemmer
+
+stemmer = SnowballStemmer('english')
 
 categories_file_name = r'/workspace/datasets/product_data/categories/categories_0001_abcat0010000_to_pcmcat99300050000.xml'
 
@@ -16,7 +19,7 @@ output_file_name = r'/workspace/datasets/labeled_query_data.txt'
 
 parser = argparse.ArgumentParser(description='Process arguments.')
 general = parser.add_argument_group("general")
-general.add_argument("--min_queries", default=1,  help="The minimum number of queries per category label (default is 1)")
+general.add_argument("--min_queries", default=1000,  help="The minimum number of queries per category label (default is 1)")
 general.add_argument("--output", default=output_file_name, help="the file to output to")
 
 args = parser.parse_args()
@@ -48,9 +51,42 @@ parents_df = pd.DataFrame(list(zip(categories, parents)), columns =['category', 
 df = pd.read_csv(queries_file_name)[['category', 'query']]
 df = df[df['category'].isin(categories)]
 
-# IMPLEMENT ME: Convert queries to lowercase, and optionally implement other normalization, like stemming.
+#Convert queries to lowercase, and optionally implement other normalization, like stemming.
+def transform_query(query):
+    query = query.lower()
 
-# IMPLEMENT ME: Roll up categories to ancestors to satisfy the minimum number of queries per category.
+    translator = query.maketrans(string.punctuation, ' '*len(string.punctuation))
+    query = query.translate(translator)
+    query = ' '.join(query.split())
+
+    query = stemmer.stem(query)
+
+    return query
+
+#Roll up categories to ancestors to satisfy the minimum number of queries per category.
+def roll_upto_parentcategory(cat):
+    if cat == root_category_id:
+        return cat
+    else:
+        return parents_df[parents_df.category == cat]['parent'].values[0]
+
+
+df = df[df['category'].isin(categories)]
+df['query'] = df['query'].apply(transform_query)
+df = df.dropna()
+df['count_per_category'] = df.groupby('category')['query'].transform(len)
+df['parent_category'] = df['category'].apply(roll_upto_parentcategory)
+
+conditions = [
+    (df['count_per_category'] <= min_queries),
+    (df['count_per_category'] > min_queries)
+    ]
+values = [df['parent_category'], df['category']]
+df['category'] = np.select(conditions, values)
+print(df.category.nunique())
+
+
+
 
 # Create labels in fastText format.
 df['label'] = '__label__' + df['category']
